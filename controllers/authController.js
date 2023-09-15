@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt')
 const db = require('../db'); 
+const pool = require('../db');
 const nodemailer = require('nodemailer');
 
 const createToken = (id) => {
@@ -339,6 +340,220 @@ module.exports.updateUser_put = async (req, res, next) => {
           res.status(200).json({ message: 'updated successfully' });
         } catch (err) {
           res.status(400).json({ error: err.message });
+        }
+      }
+    });
+  } else {
+    res.locals.user = null;
+    next();
+  }
+};
+
+
+
+//admin
+
+
+module.exports.getUsers = async (req, res, next) => {
+  const token = req.cookies.jwt;
+
+  if (token) {
+    try {
+      const decodedToken = jwt.verify(token, process.env.KEY);
+
+      // Token is valid, continue to the next middleware or route handler
+      req.user = decodedToken; // Save the user data from the token in the request object
+
+      const connection = await db.getConnection();
+      try {
+        const [rows] = await connection.query('SELECT * FROM users');
+        res.status(201).json({ users: rows });
+      } catch (err) {
+        console.error(err);
+        res.status(400).send(err.message); // Send the error response with status 400
+      } finally {
+        connection.release();
+      }
+    } catch (err) {
+      res.locals.user = null;
+      next(); // Move to the next middleware in case of an error
+    }
+  } else {
+    res.locals.user = null;
+    next(); // Move to the next middleware
+  }
+};
+
+
+module.exports.getProductsAdmin = async (req, res, next) => {
+  const token = req.cookies.jwt;
+
+  if (token) {
+    try {
+      const decodedToken = jwt.verify(token, process.env.KEY);
+
+      // Token is valid, continue to the next middleware or route handler
+      req.user = decodedToken; // Save the user data from the token in the request object
+
+      const connection = await db.getConnection();
+      try {
+        const [rows] = await connection.query('SELECT * FROM products');
+        res.status(201).json({ products: rows });
+      } catch (err) {
+        console.error(err);
+        res.status(400).send(err.message); // Send the error response with status 400
+      } finally {
+        connection.release();
+      }
+    } catch (err) {
+      res.locals.user = null;
+      next(); // Move to the next middleware in case of an error
+    }
+  } else {
+    res.locals.user = null;
+    next(); // Move to the next middleware
+  }
+};
+
+
+
+module.exports.getUserADMIN = async (req, res, next) => {
+  const token = req.cookies.jwt;
+  const userID = req.query.id; // Use req.query to access query parameters
+
+  if (token) {
+    jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
+      if (err) {
+        res.locals.user = null;
+        next(); // Move to the next middleware in case of an error
+      } else {
+        const adminID = decodedToken._id;
+        try {
+          const [rows, fields] = await pool.execute(
+            'SELECT * FROM users WHERE id = ?',
+            [userID]
+          );
+          const user = rows[0]; // Assuming you expect a single user
+          res.locals.user = user;
+          res.status(201).json({ user: user });
+        } catch (err) {
+          res.status(400).send(err.message); // Send the error response with status 400
+        }
+      }
+    });
+  } else {
+    res.locals.user = null;
+    next(); // Move to the next middleware
+  }
+};
+
+
+
+module.exports.updateUserADMIN_put = async (req, res, next) => {
+  const data = req.body.data;
+  const token = req.cookies.jwt;
+  const userID = req.body.userID;
+
+console.log(data)
+console.log(userID)
+
+   if (token) {
+    jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
+      if (err) {
+        res.locals.user = null;
+        next(); // Move to the next middleware in case of an error
+      } else {
+        try {
+          // Assuming 'users' is the name of your MySQL table
+          const [adminIDRows, adminIDFields] = await pool.execute(
+            'SELECT id FROM users WHERE id = ?',
+            [decodedToken.id]
+          );
+          
+           // Check if the admin exists
+          if (adminIDRows.length === 0) {
+            res.status(403).json({ error: "Unauthorized" });
+            return;
+          }
+
+
+           const [userRows, userFields] = await pool.execute(
+            'SELECT id FROM users WHERE id = ?',
+            [userID]
+          );
+
+          // Check if the user exists
+          if (userRows.length === 0) {
+            res.status(404).json({ error: "User not found" });
+            return;
+          }
+
+          const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [userID]);
+          const user = rows[0];
+        
+          if (!user) {
+             next();
+            return;
+          }
+        
+          const updateFields = Object.keys(data).map(key => `${key} = ?`).join(', ');
+          const updateValues = [...Object.values(data), userID];
+        
+          await pool.execute('UPDATE users SET ' + updateFields + ' WHERE id = ?', updateValues);
+        
+          res.status(200).json({ message: 'Updated successfully' });
+
+        } catch (err) {
+          res.status(400).json({ error: err.message });
+        }
+      }
+    });
+  } else {
+    res.locals.user = null;
+    next(); // Move to the next middleware
+  } 
+};
+
+
+module.exports.changepasswordADMIN = async (req, res, next) => {
+  const { newPassword } = req.body;
+  const token = req.cookies.jwt;
+  const userID = req.body.userID;
+
+  if (token) {
+    jwt.verify(token, process.env.KEY, async (err) => {
+      if (err) {
+        res.locals.user = null;
+        next();
+      } else {
+        try {
+          const connection = await db.getConnection();
+
+          const [rows] = await connection.execute('SELECT * FROM users WHERE id = ?', [userID]);
+          const user = rows[0];
+
+          if (!user) {
+            connection.release();
+            res.locals.user = null;
+            next();
+            return;
+          }
+
+           if (newPassword.length < 6) {
+            connection.release();
+            throw new Error('incorrect new password');
+          }
+
+          const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+          await connection.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userID]);
+          connection.release();
+
+          res.status(200).json({ message: 'Password updated successfully' });
+          return;
+        } catch (err) {
+          res.status(400).send(err.message);
+          return;
         }
       }
     });

@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const db = require('../db'); 
 const otpGenerator = require('otp-generator');
+const { pool } = require('../db');
+
 
 const requireAuth = async (req, res, next) => {
   const token = req.cookies.jwt;
@@ -19,6 +21,36 @@ const requireAuth = async (req, res, next) => {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 };
+
+
+const requireADMINAuth = async (req, res, next) => {
+  const token = req.cookies.jwt;
+  if (token) {
+    try {
+      const decodedToken = jwt.verify(token, process.env.KEY);
+
+      // Token is valid, continue to the next middleware or route handler
+      req.user = decodedToken; // Save the user data from the token in the request object
+      const [rows] = await pool.promise().execute('SELECT * FROM users WHERE id = ?', [req.user.id]);
+
+      if (rows.length > 0 && rows[0].admin) {
+        next(); // User is an admin, proceed to the next middleware or route
+      } else {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+    } catch (error) {
+      console.log(error.message);
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+  } else {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+};
+
+module.exports = requireADMINAuth;
+
+
+module.exports = requireADMINAuth;
 
 
 const checkUser = async (req, res, next) => {
@@ -108,4 +140,4 @@ async function verifyUserResetPassword(req, res, next) {
 
 
 
-module.exports = {checkUser,verifyUserResetPassword,generateOTP,requireAuth};
+module.exports = {checkUser,verifyUserResetPassword,generateOTP,requireAuth,requireADMINAuth};

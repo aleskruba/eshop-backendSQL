@@ -3,7 +3,7 @@ const authController = require('../controllers/authController'); // Import the c
 const productController = require('../controllers/productController'); 
 const messageController = require('../controllers/messageController'); 
 const orderController = require('../controllers/orderController'); 
-const { checkUser,verifyUserResetPassword,requireAuth } = require('../middleware/authMiddleware');
+const { checkUser,verifyUserResetPassword,requireAuth,requireADMINAuth } = require('../middleware/authMiddleware');
 
 const router = Router();
 
@@ -36,6 +36,18 @@ router.get('/checkuser', checkUser, (req, res) => {
     } 
  
 });
+
+
+//admin 
+router.get('/getusers',requireADMINAuth,authController.getUsers) 
+
+router.get('/getuserADMIN',requireADMINAuth,authController.getUserADMIN) 
+router.put('/updateuserADMIN',requireADMINAuth,authController.updateUserADMIN_put) 
+
+router.put('/changepasswordADMIN',requireADMINAuth,authController.changepasswordADMIN) 
+
+
+router.get('/getproductsAdmin',requireADMINAuth,authController.getProductsAdmin) 
 
 module.exports = router;
 
