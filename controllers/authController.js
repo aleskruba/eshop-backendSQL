@@ -57,10 +57,6 @@ module.exports.signup_post = async (req, res) => {
 
     const userId = insertUserResult.insertId;
 
-    /* 
-      The rest of your code for token creation and response can be added here.
-    */
-
     res.status(201).json({ user: userId });
   } catch (error) {
     console.error('Error during sign-up:', error);
@@ -92,8 +88,8 @@ module.exports.login_post = async (req, res) => {
         return res.status(400).json({ error: 'Wrong email or password' });
       }
 
-      const accessToken = createToken(user.id); // Assuming 'id' is the primary key column name
-      const refreshToken = createRefreshToken(user.id); // Assuming 'id' is the primary key column name
+      const accessToken = createToken(user.id); 
+      const refreshToken = createRefreshToken(user.id); 
 
       res.cookie('jwt', accessToken, { httpOnly: true, maxAge: 5 * 24 * 60 * 60 * 1000 });
       res.cookie('refreshToken', refreshToken, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
@@ -123,37 +119,30 @@ module.exports.fpassword_post = async (req, res) => {
     
   try {
    
-
-    // Access the OTP from the session
     const otp = req.session.otp.value;
   
-
-    // Your other code to send the OTP via email goes here...
     let transporter = nodemailer.createTransport({
       host: 'smtp.centrum.cz',
       port: 587,
       secure: false, // true for 465, false for other ports
       auth: {
-        user: process.env.EMAILUSER, // your email address
-        pass: process.env.EMAILPASSWORD, // your email password
+        user: process.env.EMAILUSER, 
+        pass: process.env.EMAILPASSWORD, 
       },
     });
 
     let mailOptions = {
-      from: process.env.EMAILUSER, // sender address
-      to: email, // list of receivers
-      subject: 'VÝVOJÁŘKÝ TEST ZAPOMENUTÉHO HESLA', // Subject line
-      text: ` ${email}, NOVÝ KÓD ${otp}`, // plain text body
-      html: `<b>${otp}</b>`, // html body
+      from: process.env.EMAILUSER, 
+      to: email, 
+      subject: 'VÝVOJÁŘKÝ TEST ZAPOMENUTÉHO HESLA', 
+      text: ` ${email}, NOVÝ KÓD ${otp}`, 
+      html: `<b>${otp}</b>`, 
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
-        console.log(error);
-        // Handle the error here if needed
         res.status(500).json({ error: 'Email sending failed' });
       } else {
-        // Success response
         res.status(200).json({ message: 'OTP sent successfully!' });
       }
     });
@@ -169,11 +158,9 @@ module.exports.verifyOTP_post = async (req, res) => {
     const storedOTP = req.session.otp;
 
     if (storedOTP.value === code && Date.now() < storedOTP.expires) {
-      // OTP is valid and not expired
       req.session.isAuthenticated = true;
       res.status(200).json({ message: 'OTP verified successfully!' });
     } else {
-      // OTP is invalid or expired
       res.status(401).json({ error: 'Invalid OTP or session expired.' });
     }
   } catch (err) {
@@ -187,7 +174,6 @@ module.exports.verifyOTP_post = async (req, res) => {
 module.exports.resetPassword_post = async (req, res) => {
   const { password, email } = req.body;
   
-
   try {
     if (password.length < 6) {
       throw new Error('Password must be at least 6 characters');
@@ -206,7 +192,7 @@ module.exports.resetPassword_post = async (req, res) => {
       throw new Error('Password update failed');
     }
 
-    res.status(200).json({ user: userRows[0].id }); // Adjust the property according to your database schema
+    res.status(200).json({ user: userRows[0].id }); 
 
   } catch (err) {
     console.error(err);
@@ -215,15 +201,12 @@ module.exports.resetPassword_post = async (req, res) => {
 };
 
 
-
-
 module.exports.getUser = async (req, res, next) => {
   const token = req.cookies.jwt;
 
   if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
         next();
       } else {
         try {
@@ -232,14 +215,12 @@ module.exports.getUser = async (req, res, next) => {
           const [rows] = await connection.execute('SELECT * FROM users WHERE id = ?', [decodedToken.id]);
           const user = rows[0];
 
-       
-          if (user) {
+                 if (user) {
             res.locals.user = user;
             res.status(201).json({ user: user });
             next();
           } else {
-            res.locals.user = null;
-            next();
+             next();
           }
         } catch (err) {
           res.status(400).send(err.message);
@@ -247,7 +228,7 @@ module.exports.getUser = async (req, res, next) => {
       }
     });
   } else {
-    res.locals.user = null;
+    res.status(401).send({message:'Unathorized'});
     next();
   }
 };
@@ -260,7 +241,6 @@ module.exports.changePassword_post = async (req, res, next) => {
   if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
         next();
       } else {
         try {
@@ -271,8 +251,7 @@ module.exports.changePassword_post = async (req, res, next) => {
 
           if (!user) {
             connection.release();
-            res.locals.user = null;
-            next();
+             next();
             return;
           }
 
@@ -301,8 +280,8 @@ module.exports.changePassword_post = async (req, res, next) => {
       }
     });
   } else {
-    res.locals.user = null;
-    next();
+    res.status(401).send({message:'Unathorized'});
+       next();
   }
 };
 
@@ -314,8 +293,7 @@ module.exports.updateUser_put = async (req, res, next) => {
   if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
-        next();
+         next();
       } else {
         try {
           const connection = await db.getConnection();
@@ -325,7 +303,6 @@ module.exports.updateUser_put = async (req, res, next) => {
 
           if (!user) {
             connection.release();
-            res.locals.user = null;
             next();
             return;
           }
@@ -344,8 +321,8 @@ module.exports.updateUser_put = async (req, res, next) => {
       }
     });
   } else {
-    res.locals.user = null;
-    next();
+    res.status(401).send({message:'Unathorized'});
+     next();
   }
 };
 
@@ -361,8 +338,7 @@ module.exports.getUsers = async (req, res, next) => {
     try {
       const decodedToken = jwt.verify(token, process.env.KEY);
 
-      // Token is valid, continue to the next middleware or route handler
-      req.user = decodedToken; // Save the user data from the token in the request object
+      req.user = decodedToken; 
 
       const connection = await db.getConnection();
       try {
@@ -370,17 +346,16 @@ module.exports.getUsers = async (req, res, next) => {
         res.status(201).json({ users: rows });
       } catch (err) {
         console.error(err);
-        res.status(400).send(err.message); // Send the error response with status 400
+        res.status(400).send(err.message); 
       } finally {
         connection.release();
       }
     } catch (err) {
-      res.locals.user = null;
-      next(); // Move to the next middleware in case of an error
+       next(); 
     }
   } else {
-    res.locals.user = null;
-    next(); // Move to the next middleware
+    res.status(401).send({message:'Unathorized'});
+    next(); 
   }
 };
 
@@ -392,8 +367,7 @@ module.exports.getProductsAdmin = async (req, res, next) => {
     try {
       const decodedToken = jwt.verify(token, process.env.KEY);
 
-      // Token is valid, continue to the next middleware or route handler
-      req.user = decodedToken; // Save the user data from the token in the request object
+      req.user = decodedToken; 
 
       const connection = await db.getConnection();
       try {
@@ -401,17 +375,16 @@ module.exports.getProductsAdmin = async (req, res, next) => {
         res.status(201).json({ products: rows });
       } catch (err) {
         console.error(err);
-        res.status(400).send(err.message); // Send the error response with status 400
+        res.status(400).send(err.message); 
       } finally {
         connection.release();
       }
     } catch (err) {
-      res.locals.user = null;
-      next(); // Move to the next middleware in case of an error
+       next(); 
     }
   } else {
-    res.locals.user = null;
-    next(); // Move to the next middleware
+    res.status(401).send({message:'Unathorized'});
+    next(); 
   }
 };
 
@@ -419,13 +392,12 @@ module.exports.getProductsAdmin = async (req, res, next) => {
 
 module.exports.getUserADMIN = async (req, res, next) => {
   const token = req.cookies.jwt;
-  const userID = req.query.id; // Use req.query to access query parameters
+  const userID = req.query.id; 
 
   if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
-        next(); // Move to the next middleware in case of an error
+        next(); 
       } else {
         const adminID = decodedToken._id;
         try {
@@ -433,17 +405,16 @@ module.exports.getUserADMIN = async (req, res, next) => {
             'SELECT * FROM users WHERE id = ?',
             [userID]
           );
-          const user = rows[0]; // Assuming you expect a single user
-          res.locals.user = user;
+          const user = rows[0]; 
           res.status(201).json({ user: user });
         } catch (err) {
-          res.status(400).send(err.message); // Send the error response with status 400
+          res.status(400).send(err.message); 
         }
       }
     });
   } else {
-    res.locals.user = null;
-    next(); // Move to the next middleware
+    res.status(401).send({message:'Unathorized'});
+    next(); 
   }
 };
 
@@ -454,18 +425,14 @@ module.exports.updateUserADMIN_put = async (req, res, next) => {
   const token = req.cookies.jwt;
   const userID = req.body.userID;
 
-console.log(data)
-console.log(userID)
 
    if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
-        next(); // Move to the next middleware in case of an error
+        next(); 
       } else {
         try {
-          // Assuming 'users' is the name of your MySQL table
-          const [adminIDRows, adminIDFields] = await pool.execute(
+            const [adminIDRows, adminIDFields] = await pool.execute(
             'SELECT id FROM users WHERE id = ?',
             [decodedToken.id]
           );
@@ -482,8 +449,7 @@ console.log(userID)
             [userID]
           );
 
-          // Check if the user exists
-          if (userRows.length === 0) {
+            if (userRows.length === 0) {
             res.status(404).json({ error: "User not found" });
             return;
           }
@@ -509,8 +475,8 @@ console.log(userID)
       }
     });
   } else {
-    res.locals.user = null;
-    next(); // Move to the next middleware
+    res.status(401).send({message:'Unathorized'});
+     next(); 
   } 
 };
 
@@ -523,8 +489,7 @@ module.exports.changepasswordADMIN = async (req, res, next) => {
   if (token) {
     jwt.verify(token, process.env.KEY, async (err) => {
       if (err) {
-        res.locals.user = null;
-        next();
+         next();
       } else {
         try {
           const connection = await db.getConnection();
@@ -534,8 +499,7 @@ module.exports.changepasswordADMIN = async (req, res, next) => {
 
           if (!user) {
             connection.release();
-            res.locals.user = null;
-            next();
+             next();
             return;
           }
 
@@ -558,7 +522,7 @@ module.exports.changepasswordADMIN = async (req, res, next) => {
       }
     });
   } else {
-    res.locals.user = null;
+    res.status(401).send({message:'Unathorized'});
     next();
   }
 };

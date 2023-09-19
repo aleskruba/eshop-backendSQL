@@ -1,12 +1,10 @@
 const jwt = require('jsonwebtoken');
 const db = require('../db'); 
 
-
-
 module.exports.getProducts = async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM products'); // Assuming your table is named 'products'
-    res.status(200).json({ products: rows }); // Send the products as a JSON response
+    const [rows] = await db.query('SELECT * FROM products'); 
+    res.status(200).json({ products: rows }); 
   } catch (err) {
     console.log(err);
     res.status(500).json({ error: 'An error occurred while fetching products.' });
@@ -22,8 +20,7 @@ module.exports.updateProducts = async (req, res, next) => { // Added "next" para
   if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
-        next(); // Call the "next" function if an error occurs
+        next(); 
       } else {
         try {
           const connection = await db.getConnection();
@@ -47,12 +44,10 @@ module.exports.updateProducts = async (req, res, next) => { // Added "next" para
       }
     });
   } else {
-    res.locals.user = null;
-    next(); // Call the "next" function if there's no token
+    res.status(401).json({ message: 'Unauthorized' });
+    next(); 
   }
 };
-
-
 
 
 module.exports.purchaseProducts = async (req, res, next) => {
@@ -65,7 +60,6 @@ module.exports.purchaseProducts = async (req, res, next) => {
   if (token) {
     jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
       if (err) {
-        res.locals.user = null;
         next(); // Call the "next" function if an error occurs
       } else {
         
@@ -105,7 +99,6 @@ module.exports.purchaseProducts = async (req, res, next) => {
             }
           }
 
-          // Find or create the invoice number record
           let invoiceNumber = 2023000; // Default value if no records exist
 
           const [invoiceRows] = await db.execute('SELECT * FROM invoices ORDER BY currentNumber DESC LIMIT 1');
@@ -115,16 +108,13 @@ module.exports.purchaseProducts = async (req, res, next) => {
             invoiceNumber = lastInvoiceRecord.currentNumber + 1;
           }
 
-          // Insert order into the database
           const [orderResult] = await db.execute(
             'INSERT INTO orders (mongoUserId, date, shipment, shipmentCost, basket, invoiceNumber) VALUES (?, ?, ?, ?, ?, ?)',
             [decodedToken.id, new Date(), shipment, shipmentCost, JSON.stringify(basket), invoiceNumber]
           );
 
-          // Get the last inserted order ID
           const orderId = orderResult.insertId;
 
-          // Insert the invoice record
           await db.execute('INSERT INTO invoices (currentNumber, orderNumber) VALUES (?, ?)', [
             invoiceNumber,
             orderId,
@@ -138,7 +128,135 @@ module.exports.purchaseProducts = async (req, res, next) => {
       }
     });
   } else {
-    res.locals.user = null;
-    next(); // Call the "next" function if there's no token
+    res.status(401).json({ message: 'Unauthorized' });
+    next(); 
+  }
+};
+
+
+
+
+module.exports.getProductsAdmin = async (req, res, next) => {
+  const token = req.cookies.jwt;
+
+  if (token) {
+    jwt.verify(token, process.env.KEY, async (err) => {
+      if (err) {
+        next(); 
+      } else {
+        try {
+         
+          const [rows] = await pool.query('SELECT * FROM products');
+
+     
+          res.status(201).json({ products: rows });
+        } catch (err) {
+          res.status(400).send(err.message); 
+        }
+      }
+    });
+  } else {
+    res.status(401).json({ message: 'Unauthorized' });
+    next(); 
+  }
+};
+
+exports.getProductADMIN = async (req, res, next) => {
+  const token = req.cookies.jwt;
+  const productID = req.query.id; 
+
+  if (token) {
+    jwt.verify(token, process.env.KEY, async (err) => {
+      if (err) {
+        next(); 
+      } else {
+        try {
+         
+          const [rows] = await db.query('SELECT * FROM products WHERE id = ?', [productID]);
+
+          if (rows.length === 1) {
+            const product = rows[0];
+            res.status(201).json({ product });
+          } else {
+            res.status(404).json({ error: 'Product not found' });
+          }
+        } catch (err) {
+          res.status(400).send(err.message); 
+        }
+      }
+    });
+  } else {
+    res.status(401).json({ message: 'Unauthorized' });
+    next(); 
+  }
+};
+
+
+
+exports.updateProductADMIN_put = async (req, res, next) => {
+  const data = req.body.data;
+  const token = req.cookies.jwt;
+  const productID = req.body.productID;
+
+
+  if (token) {
+    jwt.verify(token, process.env.KEY, async (err) => {
+      if (err) {
+        next(); 
+      } else {
+        try {
+          
+          const [rows] = await db.query('UPDATE products SET ? WHERE id = ?', [data, productID]);
+
+          if (rows.affectedRows === 1) {
+            res.status(200).json({ message: 'Product updated successfully' });
+          } else {
+            res.status(404).json({ error: 'Product not found' });
+          }
+        } catch (err) {
+          res.status(400).json({ error: err.message });
+        }
+      }
+    });
+  } else {
+    res.status(401).json({ message: 'Unauthorized' });
+    next(); 
+  }
+};
+
+
+
+exports.savenewproductADMIN_post = async (req, res, next) => {
+  const data = req.body.data;
+  const token = req.cookies.jwt; 
+
+  if (token) {
+    jwt.verify(token, process.env.KEY, async (err, decodedToken) => {
+      if (err) {
+        next(); 
+      } else {
+        try {
+
+          const price = parseInt(data.price, 10);
+          const amount = parseInt(data.amount, 10);
+
+          const query = 'INSERT INTO products (name, price, amount, image, title, description, discount) VALUES (?, ?, ?, ?, ?, ?, ?)';
+          const values = [data.name, price, amount, data.image, data.title, data.description, data.discount];
+
+          const [result] = await db.query(query, values);
+
+          if (result && result.affectedRows === 1) {
+            res.status(200).json({ message: 'Product saved successfully' });
+          } else {
+            res.status(500).json({ error: 'Product could not be saved' });
+          }
+        } catch (err) {
+          res.status(400).json({ error: 'could not save the data' });
+        }
+      }
+    });
+  } else {
+    res.status(401).json({ message: 'Unauthorized' });
+    next(); 
   }
 };
